@@ -10,10 +10,8 @@
 
 HAL_StatusTypeDef mic_start(I2S_HandleTypeDef *hi2s);
 uint32_t mic_get_callback_counter(void);
+uint32_t mic_get_overrun_count(void);
 
-/* Returns the half of the buffer DMA just finished filling (MIC_HALFWORDS_PER_HALF halfwords),
- * or NULL if nothing changed. Valid only until the next callback (~8 ms), will be overwritten after that. */
-const uint16_t *mic_get_ready_half(void);
 bool mic_convert_samples(int32_t *out);
 uint32_t mic_get_sample_rate(I2S_HandleTypeDef *hi2s);
 

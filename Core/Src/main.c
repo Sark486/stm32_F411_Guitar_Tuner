@@ -27,6 +27,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include "mic.h"
 #include "level.h"
@@ -112,8 +113,6 @@ int main(void)
     printf("Mic start failed: %d\r\n", mic_status);
   }
 
-  const uint32_t one_second = 1000U;
-  uint32_t last_tick = HAL_GetTick();
   static int32_t half_converted[MIC_FRAMES_PER_HALF];
   static float dbfs;
   /* USER CODE END 2 */
@@ -123,24 +122,15 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-    
+
     /* USER CODE BEGIN 3 */
-    uint32_t now = HAL_GetTick();
-
-
     if (mic_convert_samples(half_converted))
     {
       if (level_process(half_converted, MIC_FRAMES_PER_HALF, &dbfs))
       {
-        printf("dBFS=%.1f\r\n", (double)dbfs);
+        printf("dBFS=%.1f ovr=%" PRIu32 "\r\n", (double)dbfs, mic_get_overrun_count());
       }
     }
-    
-    if ((now - last_tick) >= one_second)
-    {
-      last_tick += one_second;
-    }
-    
   }
   /* USER CODE END 3 */
 }
