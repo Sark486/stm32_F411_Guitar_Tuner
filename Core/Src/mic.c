@@ -1,30 +1,32 @@
 #include "mic.h"
 #include <stdint.h>
 
+#define MIC_HALFWORDS_PER_FRAME  4U   // 2 channels × 2 half-words (24-bit in 32-bit slot)
+#define MIC_HALFWORDS_PER_HALF   (MIC_BLOCK_SAMPLES * MIC_HALFWORDS_PER_FRAME)
 #define MIC_BUF_HALFWORDS        (MIC_HALFWORDS_PER_HALF * 2U)
 #define MIC_DMA_SIZE             (MIC_BUF_HALFWORDS / 2U)  // HAL counts 32-bit samples
 
 static uint16_t i2s_dma_buffer [MIC_BUF_HALFWORDS];
-static volatile uint32_t callback_counter = 0U;
+static volatile uint32_t blocks_filled = 0U;
 static uint32_t overrun_count = 0U;
 
-static const uint16_t *mic_get_ready_half(void)
+static const uint16_t *get_ready_half(void)
 {
-  static uint32_t last_returned = 0U;
-  uint32_t count = callback_counter;
+  static uint32_t last_consumed = 0U;
+  uint32_t filled = blocks_filled;
 
-  uint32_t gap = count - last_returned;
-  if (gap == 0)
+  uint32_t pending = filled - last_consumed;
+  if (pending == 0)
   {
     return NULL;
   }
-  if (gap > 1)
+  if (pending > 1)
   {
-    overrun_count += gap - 1;
+    overrun_count += pending - 1;
   }
 
-  last_returned = count;
-  if (count % 2 == 1)
+  last_consumed = filled;
+  if (filled % 2 == 1)
   {
     return &i2s_dma_buffer[0];
   }
@@ -43,7 +45,7 @@ void HAL_I2S_RxHalfCpltCallback(I2S_HandleTypeDef *hi2s)
 {
   if(hi2s->Instance == SPI2)
   {
-      callback_counter++;
+      blocks_filled++;
   }
 }
 
@@ -51,13 +53,13 @@ void HAL_I2S_RxCpltCallback(I2S_HandleTypeDef *hi2s)
 {
   if(hi2s->Instance == SPI2)
   {
-      callback_counter++;
+      blocks_filled++;
   }
 }
 
-uint32_t mic_get_callback_counter(void)
+uint32_t mic_get_block_count(void)
 {
-  return callback_counter;
+  return blocks_filled;
 }
 
 uint32_t mic_get_overrun_count(void)
@@ -65,19 +67,19 @@ uint32_t mic_get_overrun_count(void)
   return overrun_count;
 }
 
-bool mic_convert_samples(int32_t *out)
+bool mic_read_block(int32_t *samples_out)
 {
-  const uint16_t *half_buffer = mic_get_ready_half();
-  if (half_buffer == NULL) return false;
-  for (unsigned int i=0; i < MIC_FRAMES_PER_HALF; i++) {
-    uint32_t word = ((uint32_t)half_buffer[MIC_HALFWORDS_PER_FRAME * i] << 16) 
-                             | half_buffer[MIC_HALFWORDS_PER_FRAME * i + 1];
-    out[i] = (int32_t)word >> 8;
+  const uint16_t *source = get_ready_half();
+  if (source == NULL) return false;
+  for (unsigned int i=0; i < MIC_BLOCK_SAMPLES; i++) {
+    uint32_t raw = ((uint32_t)source[MIC_HALFWORDS_PER_FRAME * i] << 16) 
+                             | source[MIC_HALFWORDS_PER_FRAME * i + 1];
+    samples_out[i] = (int32_t)raw >> 8;
   }
   return true;
 }
 
-uint32_t mic_get_sample_rate(I2S_HandleTypeDef *hi2s)
+uint32_t mic_get_sample_rate_hz(I2S_HandleTypeDef *hi2s)
 {
   return hi2s->Init.AudioFreq;
 }

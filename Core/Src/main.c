@@ -101,7 +101,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2S2_Init();
   /* USER CODE BEGIN 2 */
-  level_init(mic_get_sample_rate(&hi2s2));
+  level_init(mic_get_sample_rate_hz(&hi2s2));
 
   HAL_StatusTypeDef mic_status = mic_start(&hi2s2);
   if (mic_status == HAL_OK)
@@ -113,7 +113,7 @@ int main(void)
     printf("Mic start failed: %d\r\n", mic_status);
   }
 
-  static int32_t half_converted[MIC_FRAMES_PER_HALF];
+  static int32_t samples[MIC_BLOCK_SAMPLES];
   static float dbfs;
   /* USER CODE END 2 */
 
@@ -124,9 +124,9 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    if (mic_convert_samples(half_converted))
+    if (mic_read_block(samples))
     {
-      if (level_process(half_converted, MIC_FRAMES_PER_HALF, &dbfs))
+      if (level_process(samples, MIC_BLOCK_SAMPLES, &dbfs))
       {
         printf("dBFS=%.1f ovr=%" PRIu32 "\r\n", (double)dbfs, mic_get_overrun_count());
       }

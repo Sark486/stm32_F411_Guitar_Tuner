@@ -4,15 +4,13 @@
 #include "stm32f4xx_hal.h" // IWYU pragma: keep
 #include <stdint.h>
 
-#define MIC_FRAMES_PER_HALF      256U
-#define MIC_HALFWORDS_PER_FRAME  4U   // 2 channels × 2 half-words (24-bit in 32-bit slot)
-#define MIC_HALFWORDS_PER_HALF   (MIC_FRAMES_PER_HALF * MIC_HALFWORDS_PER_FRAME)
+#define MIC_BLOCK_SAMPLES        256U
 
 HAL_StatusTypeDef mic_start(I2S_HandleTypeDef *hi2s);
-uint32_t mic_get_callback_counter(void);
+uint32_t mic_get_block_count(void);
 uint32_t mic_get_overrun_count(void);
 
-bool mic_convert_samples(int32_t *out);
-uint32_t mic_get_sample_rate(I2S_HandleTypeDef *hi2s);
+bool mic_read_block(int32_t *samples_out);
+uint32_t mic_get_sample_rate_hz(I2S_HandleTypeDef *hi2s);
 
 #endif /* MIC_H */
