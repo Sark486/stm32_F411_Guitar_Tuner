@@ -18,12 +18,20 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "dma.h"
+#include "i2s.h"
+#include "stm32f4xx_hal_def.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdint.h>
+#include <inttypes.h>
 #include <stdio.h>
+#include "mic.h"
+#include "level.h"
+#include <stddef.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,7 +58,7 @@
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-#define WRITE_PROTOTYPE int _write(int file, char *ptr, int len)
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -89,10 +97,24 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART2_UART_Init();
+  MX_I2S2_Init();
   /* USER CODE BEGIN 2 */
-  uint32_t counter = 0;
-  float value = 1.65f;
+  level_init(mic_get_sample_rate_hz(&hi2s2));
+
+  HAL_StatusTypeDef mic_status = mic_start(&hi2s2);
+  if (mic_status == HAL_OK)
+  {
+    printf("Mic started\r\n");
+  }
+  else
+  {
+    printf("Mic start failed: %d\r\n", mic_status);
+  }
+
+  static int32_t samples[MIC_BLOCK_SAMPLES];
+  static float dbfs;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -102,15 +124,13 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    // HAL_UART_Transmit(&huart2, data, 12, 1000);
-    HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-    // HAL_Delay(1000);
-    value = value * 1.01f;
-    printf("count=%lu value=%.3f\r\n", counter, (double)value);
-    // printf("%s", data);
-    counter++;
-    value += 0.01f;
-    HAL_Delay(1000);
+    if (mic_read_block(samples))
+    {
+      if (level_process(samples, MIC_BLOCK_SAMPLES, &dbfs))
+      {
+        printf("dBFS=%.1f ovr=%" PRIu32 "\r\n", (double)dbfs, mic_get_overrun_count());
+      }
+    }
   }
   /* USER CODE END 3 */
 }
@@ -161,14 +181,7 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-WRITE_PROTOTYPE
-{
-  //int _write(int file, char *ptr, int len)
- /* Place your implementation of fputc here */
- /* e.g. write a character to the USART1 and Loop until the end of transmission */
-  HAL_UART_Transmit(&huart2, (uint8_t *)ptr, len, 0xFFFF);
-  return len;
-}
+
 /* USER CODE END 4 */
 
 /**
