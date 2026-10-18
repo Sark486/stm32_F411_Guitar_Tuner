@@ -29,7 +29,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "mic.h"
-#include <inttypes.h>
+#include "level.h"
 #include <stddef.h>
 /* USER CODE END Includes */
 
@@ -100,6 +100,8 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2S2_Init();
   /* USER CODE BEGIN 2 */
+  level_init(mic_get_sample_rate(&hi2s2));
+
   HAL_StatusTypeDef mic_status = mic_start(&hi2s2);
   if (mic_status == HAL_OK)
   {
@@ -109,8 +111,11 @@ int main(void)
   {
     printf("Mic start failed: %d\r\n", mic_status);
   }
+
   const uint32_t one_second = 1000U;
   uint32_t last_tick = HAL_GetTick();
+  static int32_t half_converted[MIC_FRAMES_PER_HALF];
+  static float dbfs;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -121,25 +126,18 @@ int main(void)
     
     /* USER CODE BEGIN 3 */
     uint32_t now = HAL_GetTick();
+
+
+    if (mic_convert_samples(half_converted))
+    {
+      if (level_process(half_converted, MIC_FRAMES_PER_HALF, &dbfs))
+      {
+        printf("dBFS=%.1f\r\n", (double)dbfs);
+      }
+    }
+    
     if ((now - last_tick) >= one_second)
     {
-
-      static int32_t half_converted[MIC_FRAMES_PER_HALF]; 
-      mic_convert_samples(half_converted);
-      if (mic_convert_samples(half_converted))
-      {
-        printf("seconds =%" PRIu32 "\r\n", last_tick / 1000U);
-        printf("first   sample=%" PRId32 "\r\n", half_converted[0]);
-        printf("seconds sample=%" PRId32 "\r\n", half_converted[1]);
-        printf("third   sample=%" PRId32 "\r\n", half_converted[2]);
-        printf("fourth  sample=%" PRId32 "\r\n", half_converted[3]);
-        int64_t  sum = 0;
-        for (unsigned int i = 0; i < MIC_FRAMES_PER_HALF; i++)
-        {
-          sum += half_converted[i];
-        }
-        printf("mean=%" PRId32 "\r\n", (int32_t)(sum / MIC_FRAMES_PER_HALF));
-      }
       last_tick += one_second;
     }
     

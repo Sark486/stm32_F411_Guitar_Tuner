@@ -62,6 +62,10 @@ bool mic_convert_samples(int32_t *out)
                              | half_buffer[MIC_HALFWORDS_PER_FRAME * i + 1];
     out[i] = (int32_t)word >> 8;
   }
-  return 0;
+  return true;
 }
 
+uint32_t mic_get_sample_rate(I2S_HandleTypeDef *hi2s)
+{
+  return hi2s->Init.AudioFreq;
+}

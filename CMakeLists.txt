@@ -47,6 +47,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     Core/Src/retarget.c
     Core/Src/mic.c
+    Core/Src/level.c
 )
 
 # Add include paths

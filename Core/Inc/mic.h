@@ -15,5 +15,6 @@ uint32_t mic_get_callback_counter(void);
  * or NULL if nothing changed. Valid only until the next callback (~8 ms), will be overwritten after that. */
 const uint16_t *mic_get_ready_half(void);
 bool mic_convert_samples(int32_t *out);
+uint32_t mic_get_sample_rate(I2S_HandleTypeDef *hi2s);
 
 #endif /* MIC_H */
