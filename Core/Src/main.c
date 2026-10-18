@@ -18,12 +18,19 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "dma.h"
+#include "i2s.h"
+#include "stm32f4xx_hal_def.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdint.h>
 #include <stdio.h>
+#include "mic.h"
+#include <inttypes.h>
+#include <stddef.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,7 +57,7 @@
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-#define WRITE_PROTOTYPE int _write(int file, char *ptr, int len)
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -89,10 +96,21 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART2_UART_Init();
+  MX_I2S2_Init();
   /* USER CODE BEGIN 2 */
-  uint32_t counter = 0;
-  float value = 1.65f;
+  HAL_StatusTypeDef mic_status = mic_start(&hi2s2);
+  if (mic_status == HAL_OK)
+  {
+    printf("Mic started\r\n");
+  }
+  else
+  {
+    printf("Mic start failed: %d\r\n", mic_status);
+  }
+  const uint32_t one_second = 1000U;
+  uint32_t last_tick = HAL_GetTick();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -100,17 +118,31 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-
+    
     /* USER CODE BEGIN 3 */
-    // HAL_UART_Transmit(&huart2, data, 12, 1000);
-    HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-    // HAL_Delay(1000);
-    value = value * 1.01f;
-    printf("count=%lu value=%.3f\r\n", counter, (double)value);
-    // printf("%s", data);
-    counter++;
-    value += 0.01f;
-    HAL_Delay(1000);
+    uint32_t now = HAL_GetTick();
+    if ((now - last_tick) >= one_second)
+    {
+
+      static int32_t half_converted[MIC_FRAMES_PER_HALF]; 
+      mic_convert_samples(half_converted);
+      if (mic_convert_samples(half_converted))
+      {
+        printf("seconds =%" PRIu32 "\r\n", last_tick / 1000U);
+        printf("first   sample=%" PRId32 "\r\n", half_converted[0]);
+        printf("seconds sample=%" PRId32 "\r\n", half_converted[1]);
+        printf("third   sample=%" PRId32 "\r\n", half_converted[2]);
+        printf("fourth  sample=%" PRId32 "\r\n", half_converted[3]);
+        int64_t  sum = 0;
+        for (unsigned int i = 0; i < MIC_FRAMES_PER_HALF; i++)
+        {
+          sum += half_converted[i];
+        }
+        printf("mean=%" PRId32 "\r\n", (int32_t)(sum / MIC_FRAMES_PER_HALF));
+      }
+      last_tick += one_second;
+    }
+    
   }
   /* USER CODE END 3 */
 }
@@ -161,14 +193,7 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-WRITE_PROTOTYPE
-{
-  //int _write(int file, char *ptr, int len)
- /* Place your implementation of fputc here */
- /* e.g. write a character to the USART1 and Loop until the end of transmission */
-  HAL_UART_Transmit(&huart2, (uint8_t *)ptr, len, 0xFFFF);
-  return len;
-}
+
 /* USER CODE END 4 */
 
 /**
