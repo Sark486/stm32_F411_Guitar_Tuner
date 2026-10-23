@@ -6,11 +6,13 @@
 
 #define MIC_BLOCK_SAMPLES        256U
 
-HAL_StatusTypeDef mic_start(I2S_HandleTypeDef *hi2s);
+void mic_init(I2S_HandleTypeDef *hi2s);
+HAL_StatusTypeDef mic_start(void);
 uint32_t mic_get_block_count(void);
 uint32_t mic_get_overrun_count(void);
 
 bool mic_read_block(int32_t *samples_out);
-uint32_t mic_get_sample_rate_hz(I2S_HandleTypeDef *hi2s);
+uint32_t mic_get_sample_rate_hz(void);
+void mic_resync(void);
 
 #endif /* MIC_H */

@@ -8,11 +8,12 @@
 
 static uint16_t i2s_dma_buffer [MIC_BUF_HALFWORDS];
 static volatile uint32_t blocks_filled = 0U;
+static uint32_t last_consumed = 0U;
 static uint32_t overrun_count = 0U;
+static I2S_HandleTypeDef *i2s_handle;
 
 static const uint16_t *get_ready_half(void)
 {
-  static uint32_t last_consumed = 0U;
   uint32_t filled = blocks_filled;
 
   uint32_t pending = filled - last_consumed;
@@ -36,14 +37,27 @@ static const uint16_t *get_ready_half(void)
   }
 }
 
-HAL_StatusTypeDef mic_start(I2S_HandleTypeDef *hi2s)
+void mic_init(I2S_HandleTypeDef *hi2s)
+{ 
+  i2s_handle = hi2s; 
+}
+
+HAL_StatusTypeDef mic_start(void)
 {
-  return HAL_I2S_Receive_DMA(hi2s, i2s_dma_buffer, MIC_DMA_SIZE);
+  if (i2s_handle == NULL) return HAL_ERROR;
+  blocks_filled = 0U;
+  last_consumed = 0U;
+  return HAL_I2S_Receive_DMA(i2s_handle, i2s_dma_buffer, MIC_DMA_SIZE);
+}
+
+void mic_resync(void)
+{
+  last_consumed = blocks_filled;
 }
 
 void HAL_I2S_RxHalfCpltCallback(I2S_HandleTypeDef *hi2s)
 {
-  if(hi2s->Instance == SPI2)
+  if(hi2s->Instance == i2s_handle->Instance)
   {
       blocks_filled++;
   }
@@ -51,7 +65,7 @@ void HAL_I2S_RxHalfCpltCallback(I2S_HandleTypeDef *hi2s)
 
 void HAL_I2S_RxCpltCallback(I2S_HandleTypeDef *hi2s)
 {
-  if(hi2s->Instance == SPI2)
+  if(hi2s->Instance == i2s_handle->Instance)
   {
       blocks_filled++;
   }
@@ -71,7 +85,7 @@ bool mic_read_block(int32_t *samples_out)
 {
   const uint16_t *source = get_ready_half();
   if (source == NULL) return false;
-  for (unsigned int i=0; i < MIC_BLOCK_SAMPLES; i++) {
+  for (unsigned int i = 0; i < MIC_BLOCK_SAMPLES; i++) {
     uint32_t raw = ((uint32_t)source[MIC_HALFWORDS_PER_FRAME * i] << 16) 
                              | source[MIC_HALFWORDS_PER_FRAME * i + 1];
     samples_out[i] = (int32_t)raw >> 8;
@@ -79,7 +93,8 @@ bool mic_read_block(int32_t *samples_out)
   return true;
 }
 
-uint32_t mic_get_sample_rate_hz(I2S_HandleTypeDef *hi2s)
+uint32_t mic_get_sample_rate_hz(void)
 {
-  return hi2s->Init.AudioFreq;
+  if (i2s_handle == NULL) return 0;
+  return i2s_handle->Init.AudioFreq;
 }

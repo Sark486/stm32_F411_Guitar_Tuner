@@ -20,7 +20,6 @@
 #include "main.h"
 #include "dma.h"
 #include "i2s.h"
-#include "stm32f4xx_hal_def.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -101,9 +100,11 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2S2_Init();
   /* USER CODE BEGIN 2 */
-  level_init(mic_get_sample_rate_hz(&hi2s2));
 
-  HAL_StatusTypeDef mic_status = mic_start(&hi2s2);
+  mic_init(&hi2s2);
+  level_init(mic_get_sample_rate_hz());
+  HAL_StatusTypeDef mic_status = mic_start();
+  
   if (mic_status == HAL_OK)
   {
     printf("Mic started\r\n");
