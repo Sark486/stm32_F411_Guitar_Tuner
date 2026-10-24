@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include "mic.h"
 #include "level.h"
+#include "capture.h"
 #include <stddef.h>
 /* USER CODE END Includes */
 
@@ -62,8 +63,6 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-uint8_t data[] = "Hello World\n"; 
 
 /* USER CODE END 0 */
 
@@ -103,6 +102,7 @@ int main(void)
 
   mic_init(&hi2s2);
   level_init(mic_get_sample_rate_hz());
+  capture_init(&huart2);
   HAL_StatusTypeDef mic_status = mic_start();
   
   if (mic_status == HAL_OK)
@@ -116,6 +116,7 @@ int main(void)
 
   static int32_t samples[MIC_BLOCK_SAMPLES];
   static float dbfs;
+  
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -125,6 +126,29 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    uint8_t in[1];
+    if (HAL_UART_Receive(&huart2, in, 1, 0) == HAL_OK)
+    {
+      if(in[0] == 'c'){
+        printf("Capture start\r\n");
+        uint32_t start = HAL_GetTick();
+
+        bool record_result = capture_record();
+        printf("Record result=%s time=%" PRIu32 "\r\n", record_result? "OK" : "FAILED", HAL_GetTick() - start);
+        if (record_result)
+        {
+          bool send_result = capture_send();
+          printf("Send result=%s\r\n", send_result? "OK" : "FAILED");
+        }
+      
+        // Discard any bytes that arrived while the board was busy capturing.
+        uint8_t discard;
+        while (HAL_UART_Receive(&huart2, &discard, 1, 0) == HAL_OK)
+        {
+          // ignore it
+        }
+      }
+    }
     if (mic_read_block(samples))
     {
       if (level_process(samples, MIC_BLOCK_SAMPLES, &dbfs))
