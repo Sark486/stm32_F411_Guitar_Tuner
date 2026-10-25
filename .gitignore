@@ -1,3 +1,7 @@
 build
 mx.scratch
 !.settings
+.venv/
+data/captures/*.png
+__pycache__/
+*.pyc
