@@ -98,8 +98,8 @@ bool capture_send(void)
 
   bool result = true;
   uint16_t byte_chunk_size = CAPTURE_TOTAL_SAMPLES_COUNT * sizeof(int16_t) / 2;
-  result = result && (uart_send((const uint8_t *)capture_buf, byte_chunk_size, 5000U) == HAL_OK);
-  result = result && (uart_send((const uint8_t *)capture_buf + byte_chunk_size, byte_chunk_size, 5000U) == HAL_OK);
+  result = result && uart_send((const uint8_t *)capture_buf, byte_chunk_size, 5000U);
+  result = result && uart_send((const uint8_t *)capture_buf + byte_chunk_size, byte_chunk_size, 5000U);
 
   static const char end_line[] = "END\r\n";
   if (!uart_send(end_line, sizeof end_line - 1U, 100U))
