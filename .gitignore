@@ -5,3 +5,4 @@ mx.scratch
 data/captures/*.png
 __pycache__/
 *.pyc
+docs

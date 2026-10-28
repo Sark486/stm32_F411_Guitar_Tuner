@@ -26,3 +26,5 @@ file,time,label,count,rate_hz,dbfs,min,max,ref_note,ref_cents,notes
 20261025_141109_A2_hard_amp.wav,2026-10-25T14:11:09,A2_hard_amp,32768,32000,-44.5,-596,512,A2,0,", amp 15 cm, hard pluck"
 20261025_141230_E2_flat_amp.wav,2026-10-25T14:12:30,E2_flat_amp,32768,32000,-47.1,-453,451,E2,-23,", amp 15 cm, detuned flat"
 20261025_141313_E2_sharp_amp.wav,2026-10-25T14:13:13,E2_sharp_amp,32768,32000,-49.3,-314,361,E2,23,", amp 15 cm, detuned sharp"
+20261025_194529_E1_bass_amp.wav,2026-10-25T19:45:29,E1_bass_amp,32768,32000,-41.1,-666,649,E1,0,", amp 15 cm, E1 bass"
+20261025_194623_B0_bass_amp.wav,2026-10-25T19:46:23,B0_bass_amp,32768,32000,-38.1,-1003,1072,B0,0,", amp 15 cm, B0 bass"
