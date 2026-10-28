@@ -1,0 +1,29 @@
+file,time,label,count,rate_hz,dbfs,min,max,ref_note,ref_cents,notes
+20261025_000000_syn_E1_bass.wav,,syn_E1_bass,32768,32000,-44.9,-684,437,E1,0.0,"synthetic: bass model, pluck 1/5, mic HP"
+20261025_000000_syn_A1_bass.wav,,syn_A1_bass,32768,32000,-44.9,-403,652,A1,0.0,"synthetic: bass model, pluck 1/5, mic HP"
+20261025_000000_syn_D2_bass.wav,,syn_D2_bass,32768,32000,-44.9,-608,553,D2,0.0,"synthetic: bass model, pluck 1/5, mic HP"
+20261025_000000_syn_G2_bass.wav,,syn_G2_bass,32768,32000,-44.9,-447,555,G2,0.0,"synthetic: bass model, pluck 1/5, mic HP"
+20261025_000000_syn_B0_bass.wav,,syn_B0_bass,32768,32000,-44.9,-669,611,B0,0.0,"synthetic: bass model, pluck 1/5, mic HP"
+20261025_000000_syn_E1_bass_inharm.wav,,syn_E1_bass_inharm,32768,32000,-44.9,-737,582,E1,0.0,"synthetic: bass model, B = 2e-4"
+20261025_000000_syn_E1_missing_fund.wav,,syn_E1_missing_fund,32768,32000,-44.9,-575,695,E1,0.0,synthetic: no fundamental at all
+20261025_000000_syn_E1_quiet.wav,,syn_E1_quiet,32768,32000,-58.0,-147,151,E1,0.0,synthetic: bass model at -60 dBFS (low SNR)
+20261025_000000_syn_E1_flat45.wav,,syn_E1_flat45,32768,32000,-44.9,-567,730,E1,-45.0,synthetic: 45 cents flat (40.1 Hz)
+20261025_000000_syn_E2_guitar.wav,,syn_E2_guitar,32768,32000,-44.9,-543,484,E2,0.0,"synthetic: guitar model, pluck 0.15"
+20261025_000000_syn_A2_guitar.wav,,syn_A2_guitar,32768,32000,-44.9,-504,564,A2,0.0,"synthetic: guitar model, pluck 0.15"
+20261025_000000_syn_D3_guitar.wav,,syn_D3_guitar,32768,32000,-44.9,-448,509,D3,0.0,"synthetic: guitar model, pluck 0.15"
+20261025_000000_syn_G3_guitar.wav,,syn_G3_guitar,32768,32000,-44.9,-401,729,G3,0.0,"synthetic: guitar model, pluck 0.15"
+20261025_000000_syn_B3_guitar.wav,,syn_B3_guitar,32768,32000,-44.9,-633,463,B3,0.0,"synthetic: guitar model, pluck 0.15"
+20261025_000000_syn_E4_guitar.wav,,syn_E4_guitar,32768,32000,-44.9,-482,722,E4,0.0,"synthetic: guitar model, pluck 0.15"
+20261025_000000_syn_E2_fret12pluck.wav,,syn_E2_fret12pluck,32768,32000,-44.9,-469,416,E2,0.0,synthetic: pluck at 1/2: no even harmonics
+20261025_000000_syn_A2_h3loud.wav,,syn_A2_h3loud,32768,32000,-44.9,-558,513,A2,0.0,synthetic: 3rd harmonic 20 dB above the fundamental
+20261025_000000_syn_E2_glide.wav,,syn_E2_glide,32768,32000,-44.9,-461,607,E2,-3.0,synthetic: falls 6 cents over 1 s
+20261025_000000_syn_E2_inharm.wav,,syn_E2_inharm,32768,32000,-44.9,-544,506,E2,0.0,synthetic: guitar B = 1e-4
+20261025_000000_syn_E2_noisy.wav,,syn_E2_noisy,32768,32000,-56.6,-174,158,E2,0.0,synthetic: -58 dBFS: barely above the room
+20261025_000000_syn_E5_guitar.wav,,syn_E5_guitar,32768,32000,-44.9,-410,579,E5,0.0,synthetic: fretted high note
+20261025_000000_syn_A5_guitar.wav,,syn_A5_guitar,32768,32000,-44.9,-438,452,A5,0.0,synthetic: fretted high note
+20261025_000000_syn_E6_guitar.wav,,syn_E6_guitar,32768,32000,-44.9,-549,409,E6,0.0,synthetic: fretted high note
+20261025_000000_syn_E6_sine.wav,,syn_E6_sine,32768,32000,-44.9,-363,394,E6,0.0,synthetic: pure sine at 1318.5 Hz
+20261025_000000_syn_E1_sine.wav,,syn_E1_sine,32768,32000,-44.9,-370,804,E1,0.0,synthetic: pure sine at 41.2 Hz
+20261025_000000_halfspeed_E2_open_amp.wav,,halfspeed_E2_open_amp,32768,32000,-47.8,-429,399,E1,0.0,synthetic: E2 open (amp) at half speed
+20261025_000000_halfspeed_A2_open_amp.wav,,halfspeed_A2_open_amp,32768,32000,-47.2,-409,429,A1,0.0,synthetic: A2 open (amp) at half speed
+20261025_000000_halfspeed_E2_open_unpl.wav,,halfspeed_E2_open_unpl,32768,32000,-59.2,-112,123,E1,0.0,synthetic: E2 open (unplugged) at half speed
