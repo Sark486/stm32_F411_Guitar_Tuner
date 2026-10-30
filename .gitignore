@@ -6,3 +6,7 @@ data/captures/*.png
 __pycache__/
 *.pyc
 docs
+
+# Machine-specific host-test setup
+tests/CMakeUserPresets.json
+tests/.vscode/
