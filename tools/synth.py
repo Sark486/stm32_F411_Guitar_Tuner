@@ -74,7 +74,7 @@ def harmonic_tone(f0, amps, B=0.0, decay_s=1.5, glide_cents=0.0, n=N, fs=FS, see
 
 
 def mic_highpass(x, fs=FS, corner=60.0):
-    return sosfilt(butter(2, corner, btype="highpass", fs=fs, output="sos"), x)
+    return np.asarray(sosfilt(butter(2, corner, btype="highpass", fs=fs, output="sos"), x))
 
 
 def set_level(x, dbfs):

@@ -339,7 +339,7 @@ def evaluate_files(paths, detector_name, args):
     return results
 
 
-def summary_rows(results, paths_by_label=None):
+def summary_rows(results):
     rows = []
     for label, f_ref, res in results:
         rows.append({"label": label, "ref_hz": round(f_ref, 2) if f_ref else "",
