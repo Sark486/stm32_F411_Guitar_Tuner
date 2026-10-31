@@ -1,7 +1,12 @@
+#include <math.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #include "pitch.h"          /* public interface, via the pitch target */
-#include "pitch_stages.h"   /* internal header, via lib/pitch/src */
+#define VECTOR_SIZE           32768U // vector for raw input data size, comes from vectors.txt
+#define VECTOR_SIZE_DECIMATED 8192U // vector for decimated data size, comes from vectors.txt
+#define TOLERANCE             1e-6f // decimated values comparison tolerance, comes from vectors.txt
 
 static uint16_t failure_count = 0U;
 static pitch_t state;
@@ -15,13 +20,32 @@ static void test_check(bool result, const char *description)
   }
 }
 
+static bool read_file(const char *path, void *dest, size_t elem_size, size_t exp_cnt)
+{ 
+  FILE* fp = fopen(path, "rb");
+  if (fp == NULL)
+  {
+    printf("File open error: %s\n", path);
+    return false;
+  }
+  size_t actual_cnt = fread(dest, elem_size, exp_cnt, fp);
+  if (exp_cnt != actual_cnt)
+  {
+    printf("File read error: %s, elements expected: %zu, actual: %zu\n", path, exp_cnt, actual_cnt);
+    fclose(fp);
+    return false;
+  }
+  fclose(fp);
+  return true;
+}
+
 static void timing_test(void)
 {
   int16_t block[PITCH_BLOCK_SIZE] = {};
   pitch_result_t result;
   bool pitch_result = false;
   pitch_init(&state);
-  for (int i = 1; i <= 20; i++)
+  for (size_t i = 1; i <= 20; i++)
   {
     pitch_result = pitch_push(&state, block, PITCH_BLOCK_SIZE, &result);
     if (i <= 15)
@@ -51,9 +75,9 @@ static void sliding_test(void)
   int16_t block[PITCH_BLOCK_SIZE] = {};
   pitch_result_t result;
   pitch_init(&state);
-  for (int i = 1; i <= 20; i++)
+  for (size_t i = 1; i <= 20; i++)
   {
-    for (unsigned int j = 0; j < PITCH_BLOCK_SIZE; j++)
+    for (size_t j = 0; j < PITCH_BLOCK_SIZE; j++)
     {
       block[j] = (int16_t)i;
     }
@@ -78,11 +102,52 @@ static void wrong_size_test(void)
   test_check(state.samples_in == 0, "samples_in is not 0");
 }
 
+
+static void decimator_test(void)
+{
+  static int16_t tone440_input[VECTOR_SIZE];
+  if (!read_file(VECTORS_DIR "/tone440_input.i16", tone440_input, sizeof(tone440_input[0]), VECTOR_SIZE))
+  {
+    failure_count++;
+    return;
+  }
+
+  static float tone440_decimated[VECTOR_SIZE_DECIMATED];
+  if (!read_file(VECTORS_DIR "/tone440_decimated.f32", tone440_decimated, sizeof(tone440_decimated[0]), VECTOR_SIZE_DECIMATED))
+  {
+    failure_count++;
+    return;
+  }
+
+  pitch_result_t result;
+  pitch_init(&state);
+  for (size_t block = 0; block < VECTOR_SIZE / PITCH_BLOCK_SIZE; block++)
+  {
+    pitch_push(&state, tone440_input + block * PITCH_BLOCK_SIZE, PITCH_BLOCK_SIZE, &result);
+    
+    for (size_t k = 0; k < PITCH_BLOCK_SIZE_DECIM; k++)
+    {
+      float actual = state.window[PITCH_WINDOW - PITCH_BLOCK_SIZE_DECIM + k];
+      float expected = tone440_decimated[block * PITCH_BLOCK_SIZE_DECIM + k];
+      bool equal = fabsf(actual - expected) <= TOLERANCE;
+      if (!equal)
+      {
+        printf("Block: %zu, index in block: %zu, actual: %.9g, expected: %.9g\n", block, k, actual, expected);
+        failure_count++;
+        return;
+      }
+    }
+    
+  }
+  
+}
+
 int main(void)
 {
   wrong_size_test();
   timing_test();
   sliding_test();
+  decimator_test();
 
   return failure_count == 0 ? 0 : 1;
 }
