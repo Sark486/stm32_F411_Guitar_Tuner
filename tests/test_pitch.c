@@ -3,10 +3,13 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "pitch.h"          /* public interface, via the pitch target */
-#define VECTOR_SIZE           32768U // vector for raw input data size, comes from vectors.txt
-#define VECTOR_SIZE_DECIMATED 8192U // vector for decimated data size, comes from vectors.txt
-#define TOLERANCE             1e-6f // decimated values comparison tolerance, comes from vectors.txt
+#include "pitch.h"            /* public interface, via the pitch target */
+#define VECTOR_SIZE               32768U // vector for raw input data size, comes from vectors.txt
+#define VECTOR_SIZE_DECIMATED     8192U // vector for decimated data size, comes from vectors.txt
+#define VECTOR_SIZE_D             (PITCH_D_LEN * 3U) // vector for d and dprime data size, comes from vectors.txt, 3 rows
+#define TOLERANCE_DECIMATED_ABS   1e-6f // decimated values absolute comparison tolerance, comes from vectors.txt
+#define TOLERANCE_D_REL           1e-4f // difference values relative comparison tolerance, comes from vectors.txt
+#define TOLERANCE_DPRIME_ABS      1e-4f // normalized difference values absolute comparison tolerance, comes from vectors.txt
 
 static uint16_t failure_count = 0U;
 static pitch_t state;
@@ -67,7 +70,6 @@ static void timing_test(void)
       test_check(result.sample_count == 5120, "sample_count is not 5120 after push 20"); // 5120 = 20 * 256 (PITCH_BLOCK_SIZE) samples
     }
   }
- 
 }
 
 static void sliding_test(void)
@@ -129,7 +131,7 @@ static void decimator_test(void)
     {
       float actual = state.window[PITCH_WINDOW - PITCH_BLOCK_SIZE_DECIM + k];
       float expected = tone440_decimated[block * PITCH_BLOCK_SIZE_DECIM + k];
-      bool equal = fabsf(actual - expected) <= TOLERANCE;
+      bool equal = fabsf(actual - expected) <= TOLERANCE_DECIMATED_ABS;
       if (!equal)
       {
         printf("Block: %zu, index in block: %zu, actual: %.9g, expected: %.9g\n", block, k, actual, expected);
@@ -137,9 +139,70 @@ static void decimator_test(void)
         return;
       }
     }
-    
   }
-  
+}
+
+static void d_cmndf_test(void)
+{
+  static int16_t tone440_input[VECTOR_SIZE];
+  if (!read_file(VECTORS_DIR "/tone440_input.i16", tone440_input, sizeof(tone440_input[0]), VECTOR_SIZE))
+  {
+    failure_count++;
+    return;
+  }
+
+  static float tone440_d[VECTOR_SIZE_D];
+  if (!read_file(VECTORS_DIR "/tone440_d.f32", tone440_d, sizeof(tone440_d[0]), VECTOR_SIZE_D))
+  {
+    failure_count++;
+    return;
+  }
+
+  static float tone440_dprime[VECTOR_SIZE_D];
+  if (!read_file(VECTORS_DIR "/tone440_dprime.f32", tone440_dprime, sizeof(tone440_dprime[0]), VECTOR_SIZE_D))
+  {
+    failure_count++;
+    return;
+  }
+
+  pitch_result_t result;
+  pitch_init(&state);
+  size_t push_true_count = 0;
+  for (size_t block = 0; block < VECTOR_SIZE / PITCH_BLOCK_SIZE; block++)
+  {
+    bool push_result = pitch_push(&state, tone440_input + block * PITCH_BLOCK_SIZE, PITCH_BLOCK_SIZE, &result);
+    if(push_result)
+    {
+      // checking frames 0, 14, 28
+      if (push_true_count % 14 == 0)
+      {
+        size_t offset = (push_true_count / 14) * PITCH_D_LEN;
+        for (size_t tau = 0; tau < PITCH_D_LEN; tau++)
+        {
+          float actual_d = state.d[tau];
+          float expected_d = tone440_d[offset + tau];
+          bool equal_d = fabsf(actual_d - expected_d) <= TOLERANCE_D_REL * fabsf(expected_d);
+          if (!equal_d)
+          {
+            printf("D: Block: %zu, tau: %zu, actual: %.9g, expected: %.9g\n", block, tau, actual_d, expected_d);
+            failure_count++;
+          }
+
+          float actual_dprime = state.dprime[tau];
+          float expected_dprime = tone440_dprime[offset + tau];
+          bool equal_dprime = fabsf(actual_dprime - expected_dprime) <= TOLERANCE_DPRIME_ABS;
+
+          if (!equal_dprime)
+          {
+            printf("Dprime: Block: %zu, tau: %zu, actual: %.9g, expected: %.9g\n", block, tau, actual_dprime, expected_dprime);
+            failure_count++;
+          }
+        }
+      }
+      push_true_count++;
+    }
+  }
+  test_check(push_true_count == 29, "Should do 29 pushes that return true");
 }
 
 int main(void)
@@ -148,6 +211,7 @@ int main(void)
   timing_test();
   sliding_test();
   decimator_test();
+  d_cmndf_test();
 
   return failure_count == 0 ? 0 : 1;
 }

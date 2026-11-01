@@ -12,6 +12,7 @@
 #define PITCH_FIR_TAPS         119U                             // filter coefficients; must match fir_taps.h
 #define PITCH_TAU_MAX          276U                             // ceil(8000/29); search floor 29 Hz, about A#0, a semitone under B0, so a flat B0 still reads
 #define PITCH_D_LEN            (PITCH_TAU_MAX + 2U)             // candidate periods 0 to TAU_MAX + 1; the extra one is the right-hand neighbour of the best candidate
+#define PITCH_YIN_W            (PITCH_WINDOW - PITCH_TAU_MAX - 1)  // number of samples compared at each candidate period
 
 
 typedef struct {

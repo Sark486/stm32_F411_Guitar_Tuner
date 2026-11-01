@@ -1,4 +1,5 @@
 #include "pitch.h"
+#include <stddef.h>
 #include <string.h>
 #include "fir_taps.h"
 
@@ -46,6 +47,39 @@ static void decimate(float *fir_delay, float *window, const int16_t *new_block)
   memmove(fir_delay, fir_delay + PITCH_BLOCK_SIZE, (PITCH_FIR_TAPS - 1) * sizeof(*fir_delay));
 }
 
+//calculating difference between the one and frame and another, shfted by tau
+static void difference(const float *window, float *d)
+{
+  for (size_t tau = 0; tau < PITCH_D_LEN; tau++)
+  {
+    float sum = 0.0f;
+    for (size_t i = 0; i < PITCH_YIN_W; i++)
+    {
+      float difference = window[i] - window[i + tau];
+      sum += difference * difference;
+    }
+    d[tau] = sum;
+  }
+}
+
+//calculating normalized difference between the one and frame and another, shfted by tau; Cumulative Mean Normalized Difference Function
+static void cmndf(const float *d, float *dprime)
+{
+  dprime[0] = 1.0f;
+  float sum = 0.0f;
+  for (size_t tau = 1; tau < PITCH_D_LEN; tau++)
+  {
+    sum += d[tau];
+    if (sum == 0.0f)
+    {
+      dprime[tau] = 1.0f;
+    } else 
+    {
+      dprime[tau] = (d[tau] * ((float)tau)) / sum;
+    }
+  }
+}
+
 
 void pitch_init(pitch_t *state)
 {
@@ -77,6 +111,9 @@ bool pitch_push(pitch_t *state, const int16_t *block, uint32_t count, pitch_resu
 
   if (state->filled == PITCH_WINDOW && state->since_hop >= PITCH_HOP) 
   {
+    difference(state->window, state->d);
+    cmndf(state->d, state->dprime);
+
     state->since_hop = 0;
     out->sample_count = state->samples_in;
     out->valid = false;
