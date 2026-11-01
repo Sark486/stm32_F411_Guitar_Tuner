@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -10,6 +11,9 @@
 #define TOLERANCE_DECIMATED_ABS   1e-6f // decimated values absolute comparison tolerance, comes from vectors.txt
 #define TOLERANCE_D_REL           1e-4f // difference values relative comparison tolerance, comes from vectors.txt
 #define TOLERANCE_DPRIME_ABS      1e-4f // normalized difference values absolute comparison tolerance, comes from vectors.txt
+#define TOLERANCE_TAU_ABS         1e-3f // YIN period (8 kHz samples) absolute comparison tolerance, comes from vectors.txt
+#define TOLERANCE_CONFIDENCE_ABS  1e-4f // confidence (d' at the dip) absolute comparison tolerance, comes from vectors.txt
+#define RESULTS_COUNT             29U   // results per case: (32768 - 4096) / 1024 + 1, rows in <case>_results.csv
 
 static uint16_t failure_count = 0U;
 static pitch_t state;
@@ -107,6 +111,7 @@ static void wrong_size_test(void)
 
 static void decimator_test(void)
 {
+  // reading input and golden standard file
   static int16_t tone440_input[VECTOR_SIZE];
   if (!read_file(VECTORS_DIR "/tone440_input.i16", tone440_input, sizeof(tone440_input[0]), VECTOR_SIZE))
   {
@@ -121,6 +126,7 @@ static void decimator_test(void)
     return;
   }
 
+  // test code begins
   pitch_result_t result;
   pitch_init(&state);
   for (size_t block = 0; block < VECTOR_SIZE / PITCH_BLOCK_SIZE; block++)
@@ -144,6 +150,7 @@ static void decimator_test(void)
 
 static void d_cmndf_test(void)
 {
+  // reading input and golden standard files
   static int16_t tone440_input[VECTOR_SIZE];
   if (!read_file(VECTORS_DIR "/tone440_input.i16", tone440_input, sizeof(tone440_input[0]), VECTOR_SIZE))
   {
@@ -165,6 +172,7 @@ static void d_cmndf_test(void)
     return;
   }
 
+  // test code begins
   pitch_result_t result;
   pitch_init(&state);
   size_t push_true_count = 0;
@@ -205,6 +213,86 @@ static void d_cmndf_test(void)
   test_check(push_true_count == 29, "Should do 29 pushes that return true");
 }
 
+/*
+  Runs one case through pitch_push and compares tau and confidence of every result with <case>_results.csv.
+  CSV columns: frame,time_s,tau,freq_hz,confidence,valid; one header line.
+*/
+static void yin_case_test(const char *input_path, const char *results_path)
+{
+  // reading input and golden standard file
+  static int16_t input[VECTOR_SIZE];
+  if (!read_file(input_path, input, sizeof(input[0]), VECTOR_SIZE))
+  {
+    failure_count++;
+    return;
+  }
+
+  FILE *fp = fopen(results_path, "r");
+  if (fp == NULL)
+  {
+    printf("File open error: %s\n", results_path);
+    failure_count++;
+    return;
+  }
+
+  // skip the header line; the next %u skips the newline left behind
+  if (fscanf(fp, "%*[^\n]") == EOF)
+  {
+    printf("Empty file: %s\n", results_path);
+    failure_count++;
+    fclose(fp);
+  }
+
+  // test code begins
+  pitch_result_t result;
+  pitch_init(&state);
+  uint32_t result_count = 0U;
+  for (size_t block = 0; block < VECTOR_SIZE / PITCH_BLOCK_SIZE; block++)
+  {
+    if (!pitch_push(&state, input + block * PITCH_BLOCK_SIZE, PITCH_BLOCK_SIZE, &result))
+    {
+      continue;
+    }
+
+    uint32_t frame;
+    float expected_tau;
+    float expected_confidence;
+    int expected_valid;
+    // * in the format reads a field and discards it
+    int fields = fscanf(fp, "%" SCNu32 ",%*f,%f,%*f,%f,%d", &frame, &expected_tau, &expected_confidence, &expected_valid);
+    if (fields != 4)
+    {
+      printf("%s: bad or missing row for result %" PRIu32 " (fscanf returned %d)\n", results_path, result_count, fields);
+      failure_count++;
+      fclose(fp);
+    }
+    if (frame != result_count)
+    {
+      printf("%s: row frame %" PRIu32 ", expected %" PRIu32 "\n", results_path, frame, result_count);
+      failure_count++;
+      fclose(fp);
+    }
+
+    // tau is compared only on valid rows.
+    if (expected_valid == 1 && fabsf(result.tau - expected_tau) > TOLERANCE_TAU_ABS)
+    {
+      printf("%s: frame %" PRIu32 ", tau actual: %.9g, expected: %.9g\n", results_path, frame, result.tau, expected_tau);
+      failure_count++;
+      fclose(fp);
+    }
+    if (fabsf(result.confidence - expected_confidence) > TOLERANCE_CONFIDENCE_ABS)
+    {
+      printf("%s: frame %" PRIu32 ", confidence actual: %.9g, expected: %.9g\n", results_path, frame, result.confidence, expected_confidence);
+      failure_count++;
+      fclose(fp);
+    }
+    result_count++;
+  }
+
+  test_check(result_count == RESULTS_COUNT, "yin_case_test: result count is not 29");
+  test_check(fscanf(fp, "%*s") == EOF, "yin_case_test: results file has more rows than results");
+}
+
 int main(void)
 {
   wrong_size_test();
@@ -212,6 +300,8 @@ int main(void)
   sliding_test();
   decimator_test();
   d_cmndf_test();
+  yin_case_test(VECTORS_DIR "/tone440_input.i16", VECTORS_DIR "/tone440_results.csv");
+  yin_case_test(VECTORS_DIR "/silence_input.i16", VECTORS_DIR "/silence_results.csv");
 
   return failure_count == 0 ? 0 : 1;
 }

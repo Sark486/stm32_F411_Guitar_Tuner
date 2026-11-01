@@ -13,6 +13,9 @@
 #define PITCH_TAU_MAX          276U                             // ceil(8000/29); search floor 29 Hz, about A#0, a semitone under B0, so a flat B0 still reads
 #define PITCH_D_LEN            (PITCH_TAU_MAX + 2U)             // candidate periods 0 to TAU_MAX + 1; the extra one is the right-hand neighbour of the best candidate
 #define PITCH_YIN_W            (PITCH_WINDOW - PITCH_TAU_MAX - 1)  // number of samples compared at each candidate period
+#define PITCH_TAU_MIN          5U      // floor(8000 / 1400): highest note 1400 Hz = 5.71 samples; rounding down leaves lag 4 as the left neighbour
+#define PITCH_YIN_THRESHOLD    0.15f   // first lag with d' below this is the period dip
+#define PITCH_GATE             0.5f    // result valid only if confidence <= this
 
 
 typedef struct {

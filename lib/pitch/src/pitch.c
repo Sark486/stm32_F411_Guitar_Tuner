@@ -9,6 +9,13 @@ static_assert(PITCH_FIR_TAPS == FIR_NUM_TAPS, "Number of taps is different betwe
 static_assert(PITCH_BLOCK_SIZE % PITCH_DECIM == 0, "PITCH_BLOCK_SIZE doesn't divide evenly by PITCH_DECIM");
 static_assert(PITCH_HOP % PITCH_BLOCK_SIZE_DECIM == 0, "PITCH_HOP doesn't divide evenly by samples count after decimation");
 
+typedef struct {
+  size_t tau_int;   // chosen whole lag
+  float  tau;       // c + parabola fraction, in 8 kHz samples
+  float  confidence; // d'[tau_int]
+  bool   in_range;  // false if the dip runs off either end of the search range
+} yin_estimate_t;
+
 /*
   Sliding the raw window to the left by PITCH_BLOCK_SIZE and adding new block to freed space on the right
 */
@@ -80,6 +87,73 @@ static void cmndf(const float *d, float *dprime)
   }
 }
 
+static yin_estimate_t yin(const float *d, const float *dprime)
+{
+
+  yin_estimate_t est;
+  size_t tau = PITCH_TAU_MIN;
+  bool found = false;
+
+  // first lag under threshold, then moving right until the bottom of the dip
+  for (size_t t = PITCH_TAU_MIN; t <= PITCH_TAU_MAX; t++)
+  {
+    if(dprime[t] < PITCH_YIN_THRESHOLD)
+    {
+      while(t + 1U <= PITCH_TAU_MAX && dprime[t + 1] < dprime[t])
+      {
+        t++;
+      }
+      tau = t;
+      found = true;
+      break;
+    }
+  }
+
+  // fallback, finding minimum in d'
+  if(!found)
+  {
+    // tau = PITCH_TAU_MIN;
+    for (size_t t = PITCH_TAU_MIN + 1U; t <= PITCH_TAU_MAX; t++)
+    {
+      if (dprime[t] < dprime[tau])
+      {
+        tau = t;
+      }
+    }
+  }
+
+  est.tau_int = tau;
+  est.confidence = dprime[tau];
+  
+  est.in_range = !((tau == PITCH_TAU_MIN && dprime[tau - 1U] < dprime[tau]) ||
+                   (tau == PITCH_TAU_MAX && dprime[tau + 1U] < dprime[tau]));
+
+  // parabola
+  // ceneter of the parabola should be on the minimum among tau-1, tau, tau+1
+  size_t c = tau - 1U;
+  if (d[tau] < d[c])
+  {
+    c = tau;
+  }
+  if (d[tau + 1U] < d[c])
+  {
+    c = tau + 1U;
+  }
+  if (c > PITCH_D_LEN - 2U)
+  {
+    c = PITCH_D_LEN - 2U;
+  }
+
+  float a = d[c - 1U];
+  float b = d[c];
+  float e = d[c + 1U];
+  float denominator = (a - 2.0f * b + e);
+  float offset = (denominator == 0.0f) ? 0.0f : 0.5f * (a - e) / denominator;
+  
+  est.tau = (float)c + offset;
+  return est;
+}
+
 
 void pitch_init(pitch_t *state)
 {
@@ -113,13 +187,14 @@ bool pitch_push(pitch_t *state, const int16_t *block, uint32_t count, pitch_resu
   {
     difference(state->window, state->d);
     cmndf(state->d, state->dprime);
+    yin_estimate_t est = yin(state->d, state->dprime);
 
     state->since_hop = 0;
     out->sample_count = state->samples_in;
+    out->confidence = est.confidence;
+    out->tau = est.tau;
     out->valid = false;
     out->freq_hz = 0.0f;
-    out->confidence = 0.0f;
-    out->tau = 0.0f;
     return true;
   }
 
