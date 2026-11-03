@@ -25,8 +25,9 @@ Usage from other scripts:
 
 Defaults are the chosen settings; tools/pitch_experiments.py measures the alternatives.
 """
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace   # replace: re-exported for the other tools
 from functools import lru_cache
+from typing import Literal, overload
 
 import numpy as np
 from scipy.signal import butter, firwin, kaiserord, sosfilt
@@ -104,7 +105,8 @@ def design_fir(fs_in, pass_hz, stop_hz, atten_db):
     numtaps, beta = kaiserord(atten_db, width)
     numtaps |= 1                                          # odd length
     cutoff = 0.5 * (pass_hz + stop_hz)
-    return firwin(numtaps, cutoff, window=("kaiser", beta), fs=fs_in)
+    # scipy's stubs type window as str only; a (name, parameter) tuple is documented and valid
+    return np.asarray(firwin(numtaps, cutoff, window=("kaiser", beta), fs=fs_in))  # pyright: ignore[reportArgumentType]
 
 
 def fir_taps(cfg):
@@ -124,7 +126,7 @@ class Decimator:
     products of length N.
     """
 
-    def __init__(self, taps, decim, dtype=np.float64):
+    def __init__(self, taps, decim, dtype: type = np.float64):
         self.h = np.asarray(taps, dtype=dtype)
         self.h_rev = self.h[::-1].copy()                  # dot with oldest..newest samples
         self.m = decim
@@ -149,8 +151,8 @@ class Highpass:
     """Optional 2nd-order Butterworth high-pass at the detector rate (one biquad, state kept
     between blocks). C equivalent: arm_biquad_cascade_df1_f32 with one stage."""
 
-    def __init__(self, corner_hz, fs, dtype=np.float64):
-        self.sos = butter(2, corner_hz, btype="highpass", fs=fs, output="sos").astype(dtype)
+    def __init__(self, corner_hz, fs, dtype: type = np.float64):
+        self.sos = np.asarray(butter(2, corner_hz, btype="highpass", fs=fs, output="sos"), dtype=dtype)
         self.zi = np.zeros((1, 2), dtype=dtype)
 
     def process(self, x):
@@ -202,6 +204,10 @@ class Estimate:
     below_threshold: bool # YIN: a dip under the absolute threshold was found
 
 
+@overload
+def yin(x, cfg, return_functions: Literal[False] = False) -> Estimate: ...
+@overload
+def yin(x, cfg, return_functions: Literal[True]) -> tuple[Estimate, dict[str, np.ndarray]]: ...
 def yin(x, cfg, return_functions=False):
     """YIN steps 2-5 on one window. Step 6 (best local estimate) is not used."""
     d = difference_function(x, cfg.tau_max)
@@ -254,6 +260,10 @@ def nsdf(x, tau_max):
     return out
 
 
+@overload
+def mpm(x, cfg, return_functions: Literal[False] = False) -> Estimate: ...
+@overload
+def mpm(x, cfg, return_functions: Literal[True]) -> tuple[Estimate, dict[str, np.ndarray]]: ...
 def mpm(x, cfg, return_functions=False):
     """MPM peak picking: key maxima between positive- and negative-going zero crossings."""
     n = nsdf(x, cfg.tau_max)

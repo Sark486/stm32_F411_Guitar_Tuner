@@ -15,9 +15,9 @@ static uint32_t n_total;
 
 /* DC blocker: y[n] = x[n] - x[n-1] + R * y[n-1]
  * https://www.dsprelated.com/freebooks/filters/DC_Blocker.html */
-static float dc_blocker(float x, float x_prev, float y_prev)
+static float dc_blocker(float x, float x_p, float y_p)
 {
-  return x - x_prev + DC_BLOCKER_R * y_prev;
+  return x - x_p + DC_BLOCKER_R * y_p;
 }
 
 bool level_process(const int32_t *samples, uint32_t count, float *dbfs_out)

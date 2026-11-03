@@ -1,0 +1,30 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "host",
+            "displayName": "Host tests (native compiler)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/../build/host",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_COMPILER": "gcc"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "host",
+            "configurePreset": "host"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "host",
+            "configurePreset": "host",
+            "output": {
+                "outputOnFailure": true
+            }
+        }
+    ]
+}

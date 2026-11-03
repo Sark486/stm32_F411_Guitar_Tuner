@@ -92,7 +92,7 @@ def spectrogram(x, rate, frame_len, hop):
 def strongest_peaks(freqs, level_db, count=8, fmin=20.0):
     """Local maxima standing at least 10 dB above their surroundings."""
     valid = freqs >= fmin
-    idx, props = find_peaks(level_db[valid], prominence=10.0)
+    idx, _ = find_peaks(level_db[valid], prominence=10.0)
     idx = idx[np.argsort(level_db[valid][idx])[::-1][:count]]
     return [(freqs[valid][i], level_db[valid][i]) for i in idx]
 

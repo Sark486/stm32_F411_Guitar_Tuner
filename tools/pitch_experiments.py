@@ -87,7 +87,7 @@ def cents(f, ref):
 
 
 def read(path):
-    fs, data = wavfile.read(path)
+    _, data = wavfile.read(path)
     return data[:, 0] if data.ndim > 1 else data
 
 
@@ -381,7 +381,7 @@ def exp_params():
 
     # confidence distributions: silence vs notes
     conf_notes, conf_sil = [], []
-    for path, f_ref, label in files:
+    for path, f_ref, _ in files:
         res = track(read(path), Config())
         (conf_sil if f_ref is None else conf_notes).extend(r.confidence for r in res)
     conf_notes, conf_sil = np.array(conf_notes), np.array(conf_sil)
@@ -463,7 +463,7 @@ def exp_robust():
 
     log("  Attack: note ok in the first window (128 ms after the capture starts) vs the rest:")
     first, rest = [], []
-    for path, f_ref, label in recordings(CAPTURES):
+    for path, f_ref, _ in recordings(CAPTURES):
         if f_ref is None:
             continue
         res = track(read(path), Config())
@@ -481,7 +481,7 @@ def exp_precision():
     worst, worst_label, flips, total = 0.0, "", 0, 0
     for method, cfg in (("yin", Config()), ("mpm", replace(Config(), method="mpm", interp="nsdf", hp_hz=20.0))):
         worst_m = 0.0
-        for path, f_ref, label in files:
+        for path, _, label in files:
             x = read(path)
             a = track(x, cfg)
             b = track(x, replace(cfg, dtype=np.float32))

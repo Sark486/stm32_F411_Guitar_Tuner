@@ -112,19 +112,19 @@ def describe(wav_path, manifest):
     for h in range(1, HARMONICS + 1):
         if f_expected * h < rate / 2 - 200:
             peaks.append(peak_near(freqs, amp, f_expected * h))
-    if not peaks or peaks[0] is None:
+    if not peaks or any(p is None for p in peaks):
         return None, f"{wav_path.name}: expected note out of range, skipped"
 
-    levels = [p[1] for p in peaks]
+    levels = [p[1] for p in peaks if p is not None]
     loudest = int(np.argmax(levels)) + 1
 
     edge = int(rate * EDGE_MS / 1000)
     decay = (rms_dbfs(x[-edge:]) - rms_dbfs(x[:edge])) / ((n - edge) / rate)
 
     half = n // 2
-    fa = peak_near(*amplitude_spectrum(x[:half], rate), f_expected * loudest)[0] / loudest
-    fb = peak_near(*amplitude_spectrum(x[half:], rate), f_expected * loudest)[0] / loudest
-    drift = 1200 * math.log2(fb / fa)
+    pa = peak_near(*amplitude_spectrum(x[:half], rate), f_expected * loudest)
+    pb = peak_near(*amplitude_spectrum(x[half:], rate), f_expected * loudest)
+    drift = 1200 * math.log2(pb[0] / pa[0]) if pa and pb else float("nan")
 
     band = freqs > LOW_LIMIT_HZ
     hf = 10 * math.log10(np.sum(amp[freqs > HF_LIMIT_HZ] ** 2) / np.sum(amp[band] ** 2))
