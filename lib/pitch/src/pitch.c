@@ -1,5 +1,7 @@
 #include "pitch.h"
+#include <math.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 #include "fir_taps.h"
 
@@ -10,9 +12,8 @@ static_assert(PITCH_BLOCK_SIZE % PITCH_DECIM == 0, "PITCH_BLOCK_SIZE doesn't div
 static_assert(PITCH_HOP % PITCH_BLOCK_SIZE_DECIM == 0, "PITCH_HOP doesn't divide evenly by samples count after decimation");
 
 typedef struct {
-  size_t tau_int;   // chosen whole lag
   float  tau;       // c + parabola fraction, in 8 kHz samples
-  float  confidence; // d'[tau_int]
+  float  confidence; // d'[tau]
   bool   in_range;  // false if the dip runs off either end of the search range
 } yin_estimate_t;
 
@@ -86,7 +87,14 @@ static void cmndf(const float *d, float *dprime)
     }
   }
 }
+static float parabola(float a, float b, float c){
+  float denominator = (a - 2.0f * b + c);
+  return (denominator == 0.0f) ? 0.0f : 0.5f * (a - c) / denominator;
+}
 
+/*
+  finding estimation on decimated sample rate
+*/
 static yin_estimate_t yin(const float *d, const float *dprime)
 {
 
@@ -122,7 +130,6 @@ static yin_estimate_t yin(const float *d, const float *dprime)
     }
   }
 
-  est.tau_int = tau;
   est.confidence = dprime[tau];
   
   est.in_range = !((tau == PITCH_TAU_MIN && dprime[tau - 1U] < dprime[tau]) ||
@@ -147,11 +154,57 @@ static yin_estimate_t yin(const float *d, const float *dprime)
   float a = d[c - 1U];
   float b = d[c];
   float e = d[c + 1U];
-  float denominator = (a - 2.0f * b + e);
-  float offset = (denominator == 0.0f) ? 0.0f : 0.5f * (a - e) / denominator;
+  float offset = parabola(a, b, e);
   
   est.tau = (float)c + offset;
   return est;
+}
+
+/*
+  finding more precise period on the full sample rate
+*/
+static float refine(const int16_t *raw_window, float *d_refine, float tau_coarse)
+{
+  // lag range
+  long center = lroundf(tau_coarse);
+  long first = center - (long)(PITCH_REFINE_SEARCH + 1);
+  first = first >= 2 ? first : 2;
+  long last = center + (long)(PITCH_REFINE_SEARCH + 1);
+  last = last <= (long)PITCH_REFINE_MAX_LAG + 1 ? last : (long)PITCH_REFINE_MAX_LAG + 1;
+  long count = last - first + 1;
+  if (count < 3)
+  {
+    return tau_coarse;
+  }
+
+  size_t first_lag = (size_t)first;
+  size_t n = (size_t)count;
+
+  for (size_t i = 0; i < n; i++)
+  {
+    size_t t = first_lag + i;
+    float sum = 0.0f;
+    for (size_t j = 0; j < PITCH_REFINE_W; j++)
+    {
+      float difference = raw_window[j] - raw_window[j + t];
+      sum += difference * difference;
+    }
+    d_refine[i] = sum;
+  }
+
+  size_t min_ind = 1U;
+  for (size_t i = 2; i < n - 1; i++)
+  {
+    if (d_refine[i] < d_refine[min_ind])
+    {
+      min_ind = i;
+    } 
+  }
+  if ((d_refine[min_ind] > d_refine[min_ind - 1]) || (d_refine[min_ind] > d_refine[min_ind + 1]))
+  {
+    return tau_coarse;
+  }
+  return (float)(first_lag + min_ind) + parabola(d_refine[min_ind-1], d_refine[min_ind], d_refine[min_ind+1]);
 }
 
 
@@ -189,12 +242,24 @@ bool pitch_push(pitch_t *state, const int16_t *block, uint32_t count, pitch_resu
     cmndf(state->d, state->dprime);
     yin_estimate_t est = yin(state->d, state->dprime);
 
+    if (!isfinite(est.tau) || est.tau <= 0.0f)
+    {
+      out->freq_hz = NAN;
+    }
+    else if (est.in_range)
+    {
+      out->freq_hz  = PITCH_FS_IN / refine(state->raw_window, state->d_refine, est.tau * PITCH_DECIM);
+    } 
+    else
+    {
+      out->freq_hz = PITCH_FS / est.tau;
+    }
+
     state->since_hop = 0;
     out->sample_count = state->samples_in;
     out->confidence = est.confidence;
     out->tau = est.tau;
-    out->valid = false;
-    out->freq_hz = 0.0f;
+    out->valid = est.in_range && est.confidence <= PITCH_GATE && isfinite(out->freq_hz);
     return true;
   }
 
