@@ -8,6 +8,7 @@
 #define CAPTURE_BLOCK_COUNT           128U
 #define CAPTURE_TIMEOUT_BLOCKS        3U // allow 3 block periods
 #define CAPTURE_TOTAL_SAMPLES_COUNT   (CAPTURE_BLOCK_COUNT * MIC_BLOCK_SAMPLES)
+#define CAPTURE_TIMEOUT_MS     5000U // per half, 32 KB at 115200 takes ~3 s
 
 static UART_HandleTypeDef *uart_handle;
 static int16_t capture_buf[CAPTURE_TOTAL_SAMPLES_COUNT];
@@ -57,6 +58,11 @@ const int16_t *capture_get_buffer()
   return capture_buf;
 }
 
+uint32_t capture_get_sample_count(void)
+{
+  return CAPTURE_TOTAL_SAMPLES_COUNT;
+}
+
 bool capture_record(void)
 {
   uint32_t rate_hz = mic_get_sample_rate_hz();
@@ -98,13 +104,64 @@ bool capture_send(void)
 
   bool result = true;
   uint16_t byte_chunk_size = CAPTURE_TOTAL_SAMPLES_COUNT * sizeof(int16_t) / 2;
-  result = result && uart_send((const uint8_t *)capture_buf, byte_chunk_size, 5000U);
-  result = result && uart_send((const uint8_t *)capture_buf + byte_chunk_size, byte_chunk_size, 5000U);
+  result = result && uart_send((const uint8_t *)capture_buf, byte_chunk_size, CAPTURE_TIMEOUT_MS);
+  result = result && uart_send((const uint8_t *)capture_buf + byte_chunk_size, byte_chunk_size, CAPTURE_TIMEOUT_MS);
 
   static const char end_line[] = "END\r\n";
   if (!uart_send(end_line, sizeof end_line - 1U, 100U))
   {
     return false;
+  }
+
+  mic_resync();
+  return result;
+}
+
+bool capture_receive(void)
+{
+  if (uart_handle == NULL) return false;
+
+  // discard bytes that arrived before the command
+  uint8_t discard;
+  while (HAL_UART_Receive(uart_handle, &discard, 1, 0) == HAL_OK)
+  {
+    // ignore it
+  }
+
+  char line[32];   // longest possible: "UPLOAD OK -2147483648\r\n" = 23 chars + '\0'
+  int len = snprintf(line, sizeof line, "READY %" PRIu32 "\r\n", (uint32_t)CAPTURE_TOTAL_SAMPLES_COUNT);
+  if (len < 0 || (size_t)len >= sizeof line)
+  {
+    return false;
+  }
+  // PC waits for this line before sending
+  if (!uart_send(line, (uint16_t)len, 100U))
+  {
+    return false;
+  }
+
+  // two halves like in capture_send, 65536 bytes don't fit into uint16_t
+  uint16_t byte_chunk_size = CAPTURE_TOTAL_SAMPLES_COUNT * sizeof(int16_t) / 2;
+  bool result = HAL_UART_Receive(uart_handle, (uint8_t *)capture_buf, byte_chunk_size, CAPTURE_TIMEOUT_MS) == HAL_OK;
+  result = result && HAL_UART_Receive(uart_handle, (uint8_t *)capture_buf + byte_chunk_size, byte_chunk_size, CAPTURE_TIMEOUT_MS) == HAL_OK;
+
+  if (result)
+  {
+    // sum of samples so the PC can check the upload
+    int32_t sum = 0;
+    for (unsigned int i = 0; i < CAPTURE_TOTAL_SAMPLES_COUNT; i++)
+    {
+      sum += capture_buf[i];
+    }
+    len = snprintf(line, sizeof line, "UPLOAD OK %" PRId32 "\r\n", sum);
+  }
+  else
+  {
+    len = snprintf(line, sizeof line, "UPLOAD FAILED\r\n");
+  }
+  if (len > 0 && (size_t)len < sizeof line)
+  {
+    uart_send(line, (uint16_t)len, 100U);
   }
 
   mic_resync();

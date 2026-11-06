@@ -30,7 +30,11 @@
 #include <stdio.h>
 #include "mic.h"
 #include "level.h"
+#if TUNER_CAPTURE
 #include "capture.h"
+#include "replay.h"
+#endif
+#include "cycles.h"
 #include <stddef.h>
 /* USER CODE END Includes */
 
@@ -102,7 +106,25 @@ int main(void)
 
   mic_init(&hi2s2);
   level_init(mic_get_sample_rate_hz());
+#if TUNER_CAPTURE
   capture_init(&huart2);
+#endif
+
+  cycles_init();
+  // uint32_t start = cycles_get();
+  // uint32_t end = cycles_get();
+  // printf("Cycles own lag %" PRIu32 "\r\n", end - start);
+  // for (size_t i= 0; i < 10; i++){
+  //   start = cycles_get();
+  //   HAL_GPIO_WritePin(MARK1_GPIO_Port, MARK1_Pin, GPIO_PIN_SET);
+  //   HAL_Delay(10);
+  //   HAL_GPIO_WritePin(MARK1_GPIO_Port, MARK1_Pin, GPIO_PIN_RESET);
+  //   end = cycles_get();
+  //   printf("HAL delay 10 lag %" PRIu32 "\r\n", end - start);
+  // }
+  
+
+
   HAL_StatusTypeDef mic_status = mic_start();
   
   if (mic_status == HAL_OK)
@@ -116,6 +138,9 @@ int main(void)
 
   static int32_t samples[MIC_BLOCK_SAMPLES];
   static float dbfs;
+#if TUNER_CAPTURE
+  static bool capture_filled = false; // the capture buffer holds a recording (c) or an upload (u)
+#endif
   
   /* USER CODE END 2 */
 
@@ -129,25 +154,46 @@ int main(void)
     uint8_t in[1];
     if (HAL_UART_Receive(&huart2, in, 1, 0) == HAL_OK)
     {
+#if TUNER_CAPTURE
       if(in[0] == 'c'){
         printf("Capture start\r\n");
         uint32_t start = HAL_GetTick();
 
         bool record_result = capture_record();
+        capture_filled = record_result;
         printf("Record result=%s time=%" PRIu32 "\r\n", record_result? "OK" : "FAILED", HAL_GetTick() - start);
         if (record_result)
         {
           bool send_result = capture_send();
           printf("Send result=%s\r\n", send_result? "OK" : "FAILED");
         }
-      
-        // Discard any bytes that arrived while the board was busy capturing.
-        uint8_t discard;
-        while (HAL_UART_Receive(&huart2, &discard, 1, 0) == HAL_OK)
+      }
+      else if (in[0] == 'u')
+      {
+        // one recording from the PC into the capture buffer (tools/replay_compare.py)
+        capture_filled = capture_receive();
+      }
+      else if (in[0] == 'r')
+      {
+        // the capture buffer through the pitch module, every push timed
+        if (capture_filled)
         {
-          // ignore it
+          replay_run(capture_get_buffer(), capture_get_sample_count());
+          mic_resync(); // main was busy for about a second: skip the halves that piled up
+        }
+        else
+        {
+          printf("REPLAY FAILED no data, send c or u first\r\n");
         }
       }
+
+      // Discard any bytes that arrived while the board was busy.
+      uint8_t discard;
+      while (HAL_UART_Receive(&huart2, &discard, 1, 0) == HAL_OK)
+      {
+        // ignore it
+      }
+#endif
     }
     if (mic_read_block(samples))
     {

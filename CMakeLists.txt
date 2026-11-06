@@ -39,6 +39,8 @@ add_subdirectory(cmake/stm32cubemx)
 
 # Portable C modules (lib/): also built by the host tests in tests/
 add_subdirectory(lib)
+target_compile_options(pitch PRIVATE -Os)
+target_compile_options(level PRIVATE -Os)
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -50,8 +52,17 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     Core/Src/retarget.c
     Core/Src/mic.c
-    Core/Src/capture.c
+    Core/Src/cycles.c
 )
+
+# Optional capture module (record + send raw samples over UART) and replay benchmark (upload + replay)
+option(TUNER_CAPTURE "Should capture module be included" ON)
+if(TUNER_CAPTURE)
+    target_sources(${CMAKE_PROJECT_NAME} PRIVATE Core/Src/capture.c Core/Src/replay.c)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE TUNER_CAPTURE=1)
+else()
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE TUNER_CAPTURE=0)
+endif()
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -76,4 +87,4 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 )
 
 target_link_options(${CMAKE_PROJECT_NAME} PRIVATE -u _printf_float)
-target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Wall -Wextra -Wdouble-promotion)
+target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Wall -Wextra -Wdouble-promotion -Wundef)
