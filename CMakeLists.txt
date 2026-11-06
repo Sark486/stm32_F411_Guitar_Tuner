@@ -39,7 +39,7 @@ add_subdirectory(cmake/stm32cubemx)
 
 # Portable C modules (lib/): also built by the host tests in tests/
 add_subdirectory(lib)
-target_compile_options(pitch PRIVATE -Os)
+target_compile_options(pitch PRIVATE -O2)
 target_compile_options(level PRIVATE -Os)
 
 # Link directories setup

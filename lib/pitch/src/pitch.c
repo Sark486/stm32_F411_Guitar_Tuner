@@ -5,7 +5,8 @@
 #include <string.h>
 #include "fir_taps.h"
 
-#define FULL_SCALE    32768.0f // 2^15 = 32 768 for 16-bit samples
+#define FULL_SCALE     32768.0f // 2^15 = 32 768 for 16-bit samples
+#define UNROLL_FACTOR  4U // loop unrolling factor
 
 static_assert(PITCH_FIR_TAPS == FIR_NUM_TAPS, "Number of taps is different between pitch.h and fir_taps.h");
 static_assert(PITCH_BLOCK_SIZE % PITCH_DECIM == 0, "PITCH_BLOCK_SIZE doesn't divide evenly by PITCH_DECIM");
@@ -60,13 +61,28 @@ static void difference(const float *window, float *d)
 {
   for (size_t tau = 0; tau < PITCH_D_LEN; tau++)
   {
-    float sum = 0.0f;
-    for (size_t i = 0; i < PITCH_YIN_W; i++)
+    float sum0 = 0.0f;
+    float sum1 = 0.0f;
+    float sum2 = 0.0f;
+    float sum3 = 0.0f;
+    for (size_t i = 0; i + UNROLL_FACTOR <= PITCH_YIN_W; i += UNROLL_FACTOR)
     {
       float difference = window[i] - window[i + tau];
-      sum += difference * difference;
+      sum0 += difference * difference;
+      difference = window[i + 1] - window[i + 1 + tau];
+      sum1 += difference * difference;
+      difference = window[i + 2] - window[i + 2 + tau];
+      sum2 += difference * difference;
+      difference = window[i + 3] - window[i + 3 + tau];
+      sum3 += difference * difference;
     }
-    d[tau] = sum;
+    // remainder
+    for (size_t i = PITCH_YIN_W - (PITCH_YIN_W % UNROLL_FACTOR); i < PITCH_YIN_W; i++)
+    {
+      float difference = window[i] - window[i + tau];
+      sum0 += difference * difference;
+    }
+    d[tau] = sum0 + sum1 + sum2 + sum3;
   }
 }
 
@@ -183,14 +199,30 @@ static float refine(const int16_t *raw_window, float *d_refine, float tau_coarse
   for (size_t i = 0; i < n; i++)
   {
     size_t t = first_lag + i;
-    float sum = 0.0f;
-    for (size_t j = 0; j < PITCH_REFINE_W; j++)
+    float sum0 = 0.0f;
+    float sum1 = 0.0f;
+    float sum2 = 0.0f;
+    float sum3 = 0.0f;
+    for (size_t j = 0; j + UNROLL_FACTOR <= PITCH_REFINE_W; j += UNROLL_FACTOR)
     {
       float difference = raw_window[j] - raw_window[j + t];
-      sum += difference * difference;
+      sum0 += difference * difference;
+      difference = raw_window[j + 1] - raw_window[j + 1 + t];
+      sum1 += difference * difference;
+      difference = raw_window[j + 2] - raw_window[j + 2 + t];
+      sum2 += difference * difference;
+      difference = raw_window[j + 3] - raw_window[j + 3 + t];
+      sum3 += difference * difference;
     }
-    d_refine[i] = sum;
+    for (size_t j = PITCH_REFINE_W - (PITCH_REFINE_W % UNROLL_FACTOR); j < PITCH_REFINE_W; j++)
+    {
+      float difference = raw_window[j] - raw_window[j + t];
+      sum0 += difference * difference;
+    }
+    d_refine[i] = sum0 + sum1 + sum2 + sum3;
   }
+
+
 
   size_t min_ind = 1U;
   for (size_t i = 2; i < n - 1; i++)
