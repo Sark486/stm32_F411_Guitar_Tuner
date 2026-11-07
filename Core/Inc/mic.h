@@ -4,7 +4,7 @@
 #include "stm32f4xx_hal.h" // IWYU pragma: keep
 #include <stdint.h>
 
-#define MIC_BLOCK_SAMPLES        256U
+#define MIC_BLOCK_SAMPLES        1024U // 1024 / 32000 Hz = 32 ms, one hop
 
 void mic_init(I2S_HandleTypeDef *hi2s);
 HAL_StatusTypeDef mic_start(void);

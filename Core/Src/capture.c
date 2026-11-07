@@ -5,10 +5,12 @@
 #include <inttypes.h>
 #include "stm32f4xx_hal.h"
 
-#define CAPTURE_BLOCK_COUNT           128U
 #define CAPTURE_TIMEOUT_BLOCKS        3U // allow 3 block periods
-#define CAPTURE_TOTAL_SAMPLES_COUNT   (CAPTURE_BLOCK_COUNT * MIC_BLOCK_SAMPLES)
-#define CAPTURE_TIMEOUT_MS     5000U // per half, 32 KB at 115200 takes ~3 s
+#define CAPTURE_TOTAL_SAMPLES_COUNT   32768U //(CAPTURE_BLOCK_COUNT * MIC_BLOCK_SAMPLES)
+#define CAPTURE_BLOCK_COUNT           (CAPTURE_TOTAL_SAMPLES_COUNT / MIC_BLOCK_SAMPLES)
+#define CAPTURE_TIMEOUT_MS            5000U // per half, 32 KB at 115200 takes ~3 s
+
+static_assert(CAPTURE_TOTAL_SAMPLES_COUNT % MIC_BLOCK_SAMPLES == 0, "CAPTURE_TOTAL_SAMPLES_COUNT doesn't divide evenly by MIC_BLOCK_SAMPLES");
 
 static UART_HandleTypeDef *uart_handle;
 static int16_t capture_buf[CAPTURE_TOTAL_SAMPLES_COUNT];
